@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 170 170">
+  <title>SatTracker</title>
+  <rect width="170" height="170" rx="28" fill="#0f1b2d"/>
+  <circle cx="85" cy="85" r="62" fill="#132238" stroke="#3b82c4" stroke-width="2.5"/>
+  <circle cx="85" cy="85" r="40" fill="none" stroke="#2a4a70" stroke-width="1.5"/>
+  <circle cx="85" cy="85" r="18" fill="none" stroke="#2a4a70" stroke-width="1.5"/>
+  <line x1="23" y1="85" x2="147" y2="85" stroke="#2a4a70" stroke-width="1.5"/>
+  <line x1="85" y1="23" x2="85" y2="147" stroke="#2a4a70" stroke-width="1.5"/>
+  <path d="M35 120 Q75 30 140 60" fill="none" stroke="#f5c542" stroke-width="2" stroke-dasharray="4 5"/>
+  <circle cx="117" cy="50" r="7" fill="#f5c542"/>
+  <circle cx="57" cy="64" r="3.5" fill="#8fb8e8"/>
+  <circle cx="105" cy="110" r="3.5" fill="#8fb8e8"/>
+  <circle cx="67" cy="106" r="3.5" fill="#8fb8e8"/>
+  <circle cx="123" cy="88" r="3.5" fill="#8fb8e8"/>
+</svg>
