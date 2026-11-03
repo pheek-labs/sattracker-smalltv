@@ -1,0 +1,21 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+
+# Build-Ergebnisse gehören in GitHub-Releases, nicht ins Repo
+*.bin
+*.elf
+*.map
+
+# Python
+__pycache__/
+*.pyc
+
+# Testdaten
+*.tle
+
+# System
+.DS_Store
+Thumbs.db
