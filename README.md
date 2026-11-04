@@ -8,7 +8,15 @@ die **Starlink-Satelliten über deinem Standort** in Echtzeit anzeigt.
 > Inoffizielles Hobbyprojekt, nicht von GeekMagic. Benutzung auf eigene Gefahr.
 > Die Original-Firmware lässt sich jederzeit wieder einspielen (siehe unten).
 
+<p align="center"><img src="docs/media/geraet.jpg" width="420" alt="SmallTV-Ultra mit der Starlink-Himmelskarte"></p>
+
 ## Ansichten (wechseln automatisch, oder fest einstellbar)
+
+| ISS – Position | ISS – Überflüge |
+|:---:|:---:|
+| <img src="docs/media/iss-position.gif" width="300" alt="Weltkarte mit ISS-Position und Bodenspur"> | <img src="docs/media/iss-ueberfluege.jpg" width="300" alt="Liste der nächsten ISS-Überflüge"> |
+| **Starlink – Himmel** | **Starlink – Liste** |
+| <img src="docs/media/starlink-himmel.gif" width="300" alt="Himmelskarte mit Starlink-Satelliten"> | <img src="docs/media/starlink-liste.gif" width="300" alt="Liste der Starlink-Satelliten über dem Horizont"> |
 
 1. **ISS – Position:** Weltkarte mit Tag/Nacht-Grenze, ISS-Position, Bodenspur
    (−30 bis +60 min), Höhe, Azimut/Elevation und Countdown zum nächsten Überflug.
@@ -36,9 +44,19 @@ die **Starlink-Satelliten über deinem Standort** in Echtzeit anzeigt.
 - **Datenabruf:** Er läuft über HTTP, weil TLS weder ins OTA-Limit noch in den RAM
   passt. Jede TLE-Zeile wird per Prüfsumme kontrolliert.
 
+## Hardware
+
+Benötigt wird ein **GeekMagic SmallTV-Ultra** mit ESP8266 (ESP-12F), erhältlich z. B. im
+[GeekMagic Outlet Store auf AliExpress](https://www.aliexpress.com/item/1005011742070248.html)
+ab ca. 11 € (Stand: November 2026). Die Gehäusefarbe spielt keine Rolle.
+
+> Beim Kauf auf die Variante achten: Die Firmware läuft **nur auf der ESP8266-Version**.
+> Das SmallTV-Pro (ESP32) und neuere Modelle mit ESP32-C2 werden nicht unterstützt.
+> Kein Affiliate-Link, der Verfasser verdient daran nichts.
+
 ## Flashen (per WLAN, ohne Aufschrauben)
 
-1. `SatTracker-1.0.3.bin` unter **Releases** (rechts auf der GitHub-Seite) herunterladen.
+1. `SatTracker-1.0.4.bin` unter **Releases** (rechts auf der GitHub-Seite) herunterladen.
 2. Weboberfläche des Geräts öffnen: `http://<IP des Geräts>`. Die IP zeigt die
    Original-Firmware auf dem Display bzw. im Router.
 3. Bereich **Update / Firmware Upgrade** öffnen (`/update`), die `.bin` auswählen und
@@ -48,7 +66,7 @@ die **Starlink-Satelliten über deinem Standort** in Echtzeit anzeigt.
 5. Beim ersten Start ermittelt es den Standort automatisch (siehe unten) und lädt die
    Bahndaten. Das dauert für Starlink ca. 1–2 Minuten.
 
-MD5 von `SatTracker-1.0.3.bin`: `b5525e6ac15c382f8b824d0ba8e2d0b0`
+MD5 von `SatTracker-1.0.4.bin`: `bea78261de85643f4fb3ba04b7ec45bc`
 
 Ein Update auf eine neuere SatTracker-Version geht genauso, über `http://<IP>/update`.
 
