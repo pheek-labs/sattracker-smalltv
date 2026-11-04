@@ -255,10 +255,12 @@ static void drawIssPasses(time_t now) {
 // ------------------------------------------------------------------ Starlink
 
 static void slCounts(int16_t y) {
-  String s = "ueber " + String(settings.minEl) + ": " + String(starlink.above);
-  int16_t w = text(s, LX, y, TFT_WHITE, 0);
+  // "ueber 10°: 175" – das Grad-Zeichen gehört zur Mindesthöhe, nicht zur Anzahl
+  int16_t w = text("ueber " + String(settings.minEl), LX, y, TFT_WHITE, 0);
   deg(LX + w + 1, y, TFT_WHITE);
-  text("  sichtbar: " + String(starlink.visible) + "   ", LX + w + 6, y, TFT_YELLOW, 0);
+  w += 8;  // etwas Abstand, sonst verschmilzt der Kreis mit dem Doppelpunkt
+  w += text(": " + String(starlink.above), LX + w, y, TFT_WHITE, 0);
+  text("  sichtbar: " + String(starlink.visible) + "   ", LX + w, y, TFT_YELLOW, 0);
 }
 
 static bool slNoData() {
@@ -347,8 +349,9 @@ static void drawSlList(time_t now) {
     text(v.slnum ? "SL-" + String(v.slnum) : "#" + String(v.catnr), LX, y, c, 69);
     text(String(dir(v.az)), 76, y, TFT_WHITE, 28);
     int16_t w = text("El " + String((int)v.el), 106, y, TFT_WHITE, 0);
+    // Rest bis zur Statusspalte löschen, sonst bleiben beim Wechsel 10° -> 9° alte Ziffern stehen
+    tft.fillRect(106 + w, y, 160 - 106 - w, 16, C_BG);
     deg(106 + w + 1, y, TFT_WHITE);
-    tft.fillRect(106 + w + 6, y, 10, 16, C_BG);
     String st = v.vis > 0 ? "hell" : (v.vis == 0 ? "Schatten" : "Tag");
     if (v.altKm < 450) st += " neu";
     text(st, 160, y, v.altKm < 450 ? C_NEW : c, 80);
