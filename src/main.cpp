@@ -2,7 +2,8 @@
 //
 // Sicherheitsnetz, weil das Gerät nur per WLAN geflasht werden kann:
 //  - Weboberfläche mit /update startet vor allem anderen
-//  - nach 3 Abstürzen in Folge startet nur noch der Sicherheitsmodus (WLAN + /update)
+//  - nach 3 Abstürzen in Folge startet nur noch der Sicherheitsmodus (WLAN + /update),
+//    ohne das Dateisystem anzufassen (ein kaputtes Dateisystem kann selbst die Ursache sein)
 //  - ohne WLAN öffnet das Gerät den Access Point "SatTracker-Setup"
 
 #include <Arduino.h>
@@ -40,7 +41,10 @@ static void checkCrashes() {
   ESP.rtcUserMemoryRead(RTC_SLOT, (uint32_t *)&b, sizeof(b));
   if (b.magic != RTC_MAGIC) b.crashes = 0;
   uint32_t r = ESP.getResetInfoPtr()->reason;
-  bool crash = r == REASON_EXCEPTION_RST || r == REASON_SOFT_WDT_RST || r == REASON_WDT_RST;
+  // Alles außer Einschalten, Reset-Taste, Aufwachen und gewolltem Neustart zählt als Absturz
+  // (auch abort()/assert, die der Core mit eigenem Grund meldet)
+  bool crash = r != REASON_DEFAULT_RST && r != REASON_SOFT_RESTART && r != REASON_DEEP_SLEEP_AWAKE &&
+               r != REASON_EXT_SYS_RST;
   b.crashes = crash ? b.crashes + 1 : 0;
   writeCrashes(b.crashes);
   safeMode = b.crashes >= 3;
@@ -66,11 +70,13 @@ void setup() {
   uiBegin();
   uiMessage(FW_NAME " " FW_VERSION, safeMode ? "SICHERHEITSMODUS" : "Starte...");
 
-  LittleFSConfig cfg;
-  cfg.setAutoFormat(false);  // niemals das Dateisystem der Original-Firmware formatieren
-  LittleFS.setConfig(cfg);
-  fsOk = LittleFS.begin();
-  settingsLoad();
+  if (!safeMode) {
+    LittleFSConfig cfg;
+    cfg.setAutoFormat(false);  // niemals das Dateisystem der Original-Firmware formatieren
+    LittleFS.setConfig(cfg);
+    fsOk = LittleFS.begin();
+    settingsLoad();
+  }
   applyBrightness();
 
   if (connectWifi()) {
@@ -111,7 +117,7 @@ void loop() {
 
   if (safeMode || apMode) {
     // Im Einrichtungsmodus nach 10 Minuten ohne Besucher neu versuchen (z. B. Router war aus)
-    if (apMode && millis() - apSince > 600000 && WiFi.softAPgetStationNum() == 0) ESP.restart();
+    if (apMode && millis() - apSince > 600000 && WiFi.softAPgetStationNum() == 0) webRestart();
     delay(2);
     return;
   }

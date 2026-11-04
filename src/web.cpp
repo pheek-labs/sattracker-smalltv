@@ -1,5 +1,7 @@
 // Weboberfläche: Status, Einstellungen, WLAN-Einrichtung und Firmware-Update (/update).
 // /update ist bewusst in jedem Modus erreichbar, damit man immer zurück kommt.
+// Eigene Update-Seite statt ESP8266HTTPUpdateServer: nur Firmware, kein Dateisystem-Upload.
+// Eine versehentlich als Dateisystem hochgeladene Firmware legt das Gerät sonst lahm.
 
 #include "web.h"
 #include "settings.h"
@@ -8,11 +10,12 @@
 #include "geo.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
-#include <ESP8266HTTPUpdateServer.h>
+#include <LittleFS.h>
+#include <WiFiUdp.h>
 
 static ESP8266WebServer server(80);
-static ESP8266HTTPUpdateServer updater;
 static bool ap = false, safe = false;
+static String updError;
 
 static const char HEAD[] PROGMEM =
     "<!doctype html><html lang=de><head><meta charset=utf-8>"
@@ -57,6 +60,17 @@ static void end() {
   server.sendContent("");
 }
 
+// Neustart mit definierten Pegeln an GPIO0 (Display DC) und GPIO2 (Display RST):
+// liegt GPIO0 beim Neustart auf LOW, bleibt der ESP8266 im Flash-Modus hängen
+void webRestart() {
+  pinMode(0, OUTPUT);
+  digitalWrite(0, HIGH);
+  pinMode(2, OUTPUT);
+  digitalWrite(2, HIGH);
+  delay(100);
+  ESP.restart();
+}
+
 static void row(const String &k, const String &v) {
   server.sendContent("<tr><td>" + k + "</td><td>" + v + "</td></tr>");
 }
@@ -65,6 +79,15 @@ static void updateBox() {
   server.sendContent(F(
       "<h2>Firmware-Update</h2><p>Neue <code>.bin</code> hochladen &ndash; auch die Original-Firmware "
       "(FW-Smalltv-Ultra-*.bin) zum Zur&uuml;ckwechseln.</p><p><a href='/update'><button>Firmware hochladen</button></a></p>"));
+}
+
+static void formatBox() {
+  if (fsOk) return;
+  server.sendContent(F("<h2>Dateisystem</h2><p style='color:#f84'>Das Dateisystem l&auml;sst sich nicht einbinden "
+                       "(leer oder besch&auml;digt). Ohne Dateisystem werden keine Einstellungen und Bahndaten gespeichert.</p>"
+                       "<form method=post action=/format onsubmit=\"return confirm('Dateisystem neu anlegen? "
+                       "Alle gespeicherten Daten (auch die der Original-Firmware) werden gelöscht.')\">"
+                       "<button style='background:#844'>Dateisystem neu anlegen</button></form>"));
 }
 
 static void wifiForm() {
@@ -87,6 +110,7 @@ static void handleRoot() {
   if (ap) {
     server.sendContent(F("<p>Das Ger&auml;t konnte sich nicht mit dem WLAN verbinden. Bitte Zugangsdaten eingeben.</p>"));
     wifiForm();
+    formatBox();
     updateBox();
     end();
     return;
@@ -126,7 +150,7 @@ static void handleRoot() {
   row("Uhrzeit", fmtTime(now));
   row("WLAN", esc(WiFi.SSID()) + " (" + String(WiFi.RSSI()) + " dBm)");
   row("Freier Speicher", String(ESP.getFreeHeap()) + " Bytes");
-  row("Dateisystem", fsOk ? "OK" : "<span style='color:#f84'>nicht eingebunden</span>");
+  row("Dateisystem", fsOk ? "OK" : "<span style='color:#f84'>nicht eingebunden</span> (siehe unten)");
   row("Laufzeit", String(millis() / 60000) + " min");
   row("Letzter Neustart", esc(ESP.getResetReason()));
   if (ESP.getResetInfoPtr()->reason == REASON_EXCEPTION_RST) row("Absturz-Info", esc(ESP.getResetInfo()));
@@ -165,6 +189,7 @@ static void handleRoot() {
                        "<form method=post action=/reload><button style='background:#468'>Bahndaten neu laden</button></form>"
                        "<p style='color:#888;font-size:.85em'>Celestrak bittet, Daten h&ouml;chstens alle 2 Stunden abzurufen.</p>"));
   wifiForm();
+  formatBox();
   updateBox();
   server.sendContent(F("<form method=post action=/reboot><button style='background:#844'>Neustart</button></form>"));
   end();
@@ -199,15 +224,68 @@ static void handleSave() {
 static void handleWifi() {
   strlcpy(settings.ssid, server.arg("ssid").c_str(), sizeof(settings.ssid));
   strlcpy(settings.pass, server.arg("pass").c_str(), sizeof(settings.pass));
-  bool ok = settingsSave();
+  settingsSave();  // klappt nur mit Dateisystem
+  bool ok = settings.ssid[0] != 0;
   begin();
   server.sendContent(ok ? F("<p>Gespeichert. Das Ger&auml;t startet neu und verbindet sich mit dem WLAN.</p>")
-                        : F("<p style='color:#f84'>Speichern fehlgeschlagen (kein Dateisystem).</p>"));
+                        : F("<p style='color:#f84'>Bitte einen WLAN-Namen eingeben.</p>"));
   end();
   if (ok) {
     delay(500);
-    ESP.restart();
+    // Zusätzlich im WLAN-Speicher des ESP8266 ablegen: dort liest connectWifi() sie ohne Dateisystem.
+    // Erst nach der Antwort, weil der Verbindungsversuch den Access Point kurz stören kann.
+    WiFi.persistent(true);
+    WiFi.begin(settings.ssid, settings.pass);
+    delay(200);
+    webRestart();
   }
+}
+
+static void handleUpdateForm() {
+  begin();
+  server.sendContent(F("<h2>Firmware hochladen</h2>"
+                       "<p>Nur Firmware-Dateien (<code>.bin</code>), z.&nbsp;B. <code>SatTracker-x.y.z.bin</code> "
+                       "oder die Original-Firmware <code>FW-Smalltv-Ultra-*.bin</code>.</p>"
+                       "<form method=post enctype=multipart/form-data>"
+                       "<input type=file name=firmware accept='.bin,.bin.gz'> <button>Hochladen</button></form>"
+                       "<p style='color:#888;font-size:.85em'>Nach dem Hochladen startet das Ger&auml;t neu.</p>"));
+  end();
+}
+
+static void handleUpdateUpload() {
+  HTTPUpload &u = server.upload();
+  if (u.status == UPLOAD_FILE_START) {
+    updError = "";
+    WiFiUDP::stopAll();
+    uint32_t maxSize = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+    if (!Update.begin(maxSize, U_FLASH)) updError = Update.getErrorString();
+  } else if (u.status == UPLOAD_FILE_WRITE) {
+    // Update.write prüft das erste Byte: nur echte Firmware-Dateien (0xE9) werden angenommen
+    if (!updError.length() && Update.write(u.buf, u.currentSize) != u.currentSize)
+      updError = Update.getErrorString();
+  } else if (u.status == UPLOAD_FILE_END) {
+    if (!updError.length() && !Update.end(true)) updError = Update.getErrorString();
+  } else if (u.status == UPLOAD_FILE_ABORTED) {
+    Update.end();
+    updError = "Upload abgebrochen";
+  }
+  delay(0);
+}
+
+static void handleUpdateDone() {
+  begin();
+  if (updError.length() || Update.hasError()) {
+    if (!updError.length()) updError = Update.getErrorString();
+    server.sendContent("<p style='color:#f84'><b>Update fehlgeschlagen:</b> " + esc(updError) +
+                       "</p><p>Ist das wirklich eine Firmware-Datei? Das Ger&auml;t l&auml;uft unver&auml;ndert weiter.</p>"
+                       "<p><a href='/update'>Zur&uuml;ck</a></p>");
+    end();
+    return;
+  }
+  server.sendContent(F("<meta http-equiv=refresh content='20;url=/'><p>Update erfolgreich, das Ger&auml;t startet neu ...</p>"));
+  end();
+  delay(500);
+  webRestart();
 }
 
 static void handleApi() {
@@ -243,9 +321,22 @@ void webBegin(bool apMode, bool safeMode) {
   server.on("/reboot", HTTP_POST, [] {
     redirect();
     delay(300);
-    ESP.restart();
+    webRestart();
   });
-  updater.setup(&server, "/update");
+  server.on("/format", HTTP_POST, [] {
+    // Nur wenn sich das Dateisystem nicht einbinden lässt, z. B. nach einem falschen Upload
+    // Nicht im Sicherheitsmodus: dort ist das Dateisystem absichtlich nicht eingebunden
+    if (!fsOk && !safe) {
+      LittleFS.end();
+      if (LittleFS.format()) fsOk = LittleFS.begin();
+      if (fsOk) settingsSave();
+    }
+    redirect();
+    delay(300);
+    webRestart();
+  });
+  server.on("/update", HTTP_GET, handleUpdateForm);
+  server.on("/update", HTTP_POST, handleUpdateDone, handleUpdateUpload);
   server.onNotFound([] {
     if (ap) redirect();  // Captive-Portal-ähnlich
     else server.send(404, "text/plain", "nicht gefunden");

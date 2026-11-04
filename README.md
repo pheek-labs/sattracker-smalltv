@@ -56,7 +56,7 @@ ab ca. 11 € (Stand: November 2026). Die Gehäusefarbe spielt keine Rolle.
 
 ## Flashen (per WLAN, ohne Aufschrauben)
 
-1. `SatTracker-1.0.4.bin` unter **Releases** (rechts auf der GitHub-Seite) herunterladen.
+1. `SatTracker-1.0.5.bin` unter **Releases** (rechts auf der GitHub-Seite) herunterladen.
 2. Weboberfläche des Geräts öffnen: `http://<IP des Geräts>`. Die IP zeigt die
    Original-Firmware auf dem Display bzw. im Router.
 3. Bereich **Update / Firmware Upgrade** öffnen (`/update`), die `.bin` auswählen und
@@ -66,9 +66,14 @@ ab ca. 11 € (Stand: November 2026). Die Gehäusefarbe spielt keine Rolle.
 5. Beim ersten Start ermittelt es den Standort automatisch (siehe unten) und lädt die
    Bahndaten. Das dauert für Starlink ca. 1–2 Minuten.
 
-MD5 von `SatTracker-1.0.4.bin`: `bea78261de85643f4fb3ba04b7ec45bc`
+MD5 von `SatTracker-1.0.5.bin`: `c12e4420d2e6ef4bfaa50c9b0d821f48`
 
 Ein Update auf eine neuere SatTracker-Version geht genauso, über `http://<IP>/update`.
+
+> **Bis Version 1.0.4** zeigt die Update-Seite zwei Felder: **Firmware** und **FileSystem**.
+> Die `.bin` immer bei **Firmware** hochladen. Im Feld FileSystem überschreibt sie den
+> Datenbereich, und das Gerät kann danach hängen bleiben. Ab 1.0.5 gibt es nur noch das
+> Firmware-Feld, und Dateien, die keine Firmware sind, werden abgelehnt.
 
 **Falls das WLAN nicht klappt:** Das Gerät öffnet den Access Point
 **SatTracker-Setup** (Passwort `sattracker`). Damit verbinden, http://192.168.4.1
@@ -116,9 +121,15 @@ MD5 von V9.0.50: `a5fe50093ada3c2637225bbf306a62c3`
 
 - Die Weboberfläche mit `/update` startet vor allem anderen.
 - Nach **3 Abstürzen in Folge** startet nur noch der **Sicherheitsmodus**: WLAN und
-  Firmware-Update, sonst nichts.
+  Firmware-Update, sonst nichts. Das Dateisystem bleibt dabei unangetastet, falls es
+  selbst die Ursache ist.
+- Lässt sich das Dateisystem nicht einbinden, bietet die Weboberfläche den Knopf
+  **„Dateisystem neu anlegen“**. Die WLAN-Zugangsdaten werden zusätzlich im WLAN-Speicher
+  des Chips abgelegt und funktionieren daher auch ohne Dateisystem.
 - Ein Notfall-Zugang bleibt trotzdem: das Gerät aufschrauben und einen
-  USB-Seriell-Adapter an TX/RX/GND anschließen. GPIO0 beim Einschalten auf GND legen.
+  USB-Seriell-Adapter (3,3 V) an TX/RX/GND anschließen. GPIO0 beim Einschalten auf GND legen.
+  Auf manchen Platinen gibt es dafür eine 6-polige Lochreihe. Ihre Reihenfolge unterscheidet
+  sich je nach Platinen-Version, deshalb vorher GND sicher bestimmen.
 
 ## Hardware-Hinweise
 
